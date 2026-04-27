@@ -1,0 +1,261 @@
+{
+	"info": {
+		"_postman_id": "c334032e-bb9c-45b3-b28c-7532ad79e7aa",
+		"name": "TestCollection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "37444361"
+	},
+	"item": [
+		{
+			"name": "localhost:200/register",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "inventory_name",
+							"value": "Printer",
+							"type": "text"
+						},
+						{
+							"key": "description",
+							"value": "A really cool printer.",
+							"type": "text"
+						},
+						{
+							"key": "photo",
+							"type": "file",
+							"src": "/C:/Users/Anastasiia/Downloads/U0103090_5_1740081009.jpg"
+						}
+					]
+				},
+				"url": {
+					"raw": "localhost:200/register",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:200/inventory",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory/1776771414106",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:200/inventory/1776771414106",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory",
+						"1776771414106"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory/1776771414106",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "localhost:200/inventory/1776771414106",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory",
+						"1776771414106"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory/1776771393778",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"inventory_name\": \"Phone\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:200/inventory/1776771393778",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory",
+						"1776771393778"
+					],
+					"query": [
+						{
+							"key": "",
+							"value": null,
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory/1776773280229/photo",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:200/inventory/1776773280229/photo",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory",
+						"1776773280229",
+						"photo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/inventory/1776773280229/photo",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "photo",
+							"type": "file",
+							"src": "/C:/Users/Anastasiia/Downloads/Fridge_Thumbnail__0016_DFF180E2SSDB.jpg"
+						}
+					]
+				},
+				"url": {
+					"raw": "localhost:200/inventory/1776773280229/photo",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"inventory",
+						"1776773280229",
+						"photo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/SearchForm.html",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:200/SearchForm.html",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"SearchForm.html"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "localhost:200/search",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"id\": \"1776773280229\",\r\n    \"has_photo\": true\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:200/search",
+					"host": [
+						"localhost"
+					],
+					"port": "200",
+					"path": [
+						"search"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

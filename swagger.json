@@ -1,0 +1,177 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "Inventory Service API",
+      "version": "1.0.0",
+      "description": "API for the Inventory Management System (Laboratory Work #6)"
+    },
+    "servers": [
+      {
+        "url": "http://127.0.0.1:200",
+        "description": "Local Development Server"
+      }
+    ],
+    "paths": {
+      "/register": {
+        "post": {
+          "summary": "Register a new device",
+          "description": "Allows to register a new item with a name, description, and an optional photo.",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "inventory_name": { 
+                      "type": "string",
+                      "description": "The name of the inventory item (required)"
+                    },
+                    "description": { 
+                      "type": "string",
+                      "description": "Detailed description of the item"
+                    },
+                    "photo": { 
+                      "type": "string", 
+                      "format": "binary",
+                      "description": "Image file of the item"
+                    }
+                  },
+                  "required": ["inventory_name"]
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": { "description": "Device successfully created" },
+            "400": { "description": "Bad Request: Missing required fields" },
+            "500": { "description": "Internal Server Error" }
+          }
+        }
+      },
+      "/inventory": {
+        "get": {
+          "summary": "Get list of all items",
+          "description": "Returns a JSON array of all registered inventory items.",
+          "responses": {
+            "200": { "description": "Successfully retrieved the list" },
+            "500": { "description": "Internal error while reading data" }
+          }
+        }
+      },
+      "/inventory/{id}": {
+        "parameters": [
+          { 
+            "name": "id", 
+            "in": "path", 
+            "required": true, 
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the item"
+          }
+        ],
+        "get": {
+          "summary": "Get specific item details",
+          "responses": {
+            "200": { "description": "Successfully retrieved item details" },
+            "404": { "description": "Item not found" }
+          }
+        },
+        "put": {
+          "summary": "Update item information",
+          "description": "Updates the name or description of an existing item.",
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "inventory_name": { "type": "string" },
+                    "description": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Item successfully updated" },
+            "404": { "description": "Item not found" }
+          }
+        },
+        "delete": {
+          "summary": "Delete an item",
+          "description": "Removes the item and its associated photo from the system.",
+          "responses": {
+            "200": { "description": "Item successfully deleted" },
+            "404": { "description": "Item not found" }
+          }
+        }
+      },
+      "/inventory/{id}/photo": {
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "get": {
+          "summary": "Get item photo",
+          "description": "Returns the JPEG image associated with the item.",
+          "responses": {
+            "200": { 
+              "description": "Image file",
+              "content": { "image/jpeg": {} }
+            },
+            "404": { "description": "Photo or item not found" }
+          }
+        },
+        "put": {
+          "summary": "Update item photo",
+          "description": "Replaces the existing photo with a new one.",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "photo": { "type": "string", "format": "binary" }
+                  },
+                  "required": ["photo"]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Photo successfully updated" },
+            "400": { "description": "No file uploaded" },
+            "404": { "description": "Item not found" }
+          }
+        }
+      },
+      "/search": {
+        "post": {
+          "summary": "Search item by ID",
+          "description": "Finds an item using x-www-form-urlencoded data from a search form.",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "description": "Serial number or ID" },
+                    "has_photo": { 
+                      "type": "string", 
+                      "description": "Check to include photo link in description" 
+                    }
+                  },
+                  "required": ["id"]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Item found" },
+            "404": { "description": "Item not found" }
+          }
+        }
+      }
+    }
+  }
