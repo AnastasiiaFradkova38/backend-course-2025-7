@@ -6,6 +6,8 @@ const multer = require("multer");
 const path = require("path");
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
+const sql = require('mssql');
+require('dotenv').config();
 
 program
     .requiredOption("-h, --host <host>", "server address")
@@ -18,6 +20,19 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Налаштування підключення до БД SQL Server
+const dbConfig = {
+    user: 'sa',
+    password: 'MySecretPass2026',
+    server: 'db', // Назва сервісу в compose.yml
+    database: 'InventoryDB',
+    port: 1433,
+    options: {
+        encrypt: false,
+        trustServerCertificate: true
+    }
+};
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -40,157 +55,193 @@ async function main() {
             throw new Error("Invalid port specified.");
         }
 
+        // Створюємо папку для фотографій
         await fs.mkdir(options.cache, {recursive: true});
+
+        // Підключаємося до БД один раз при старті сервера
+        const pool = await sql.connect(dbConfig);
+        console.log("Connected to SQL Server!");
     
         app.post("/register", upload.single("photo"), async (request, response) => {
             const inventoryName = request.body.inventory_name;
             const description = request.body.description || "";
-            const id = Date.now().toString();
+            const photoPath = request.file ? request.file.filename : null;
 
-            const newItem = {
-                id: id,
-                inventory_name: inventoryName,
-                description: description,
-                photo: request.file ? request.file.filename : null
-            };
+            if (!inventoryName) {
+                return response.status(400).json({ error: "inventory_name is required" });
+            }
 
             try {
-                await fs.writeFile(path.join(options.cache, `${id}.json`), JSON.stringify(newItem));
-                response.status(201).json(newItem);
+                const result = await pool.request()
+                    .input('name', sql.NVarChar, inventoryName)
+                    .input('desc', sql.NVarChar, description)
+                    .input('photo', sql.NVarChar, photoPath)
+                    .query(`
+                        INSERT INTO Inventory (InventoryName, Description, PhotoPath) 
+                        OUTPUT INSERTED.ID as id, INSERTED.InventoryName as inventory_name, INSERTED.Description as description, INSERTED.PhotoPath as photo
+                        VALUES (@name, @desc, @photo)
+                    `);
+                
+                response.status(201).json(result.recordset[0]);
             } catch (error) {
-                response.status(500).json({error: "Internal error"});
+                console.error(error);
+                response.status(500).json({error: "Internal error during database insert."});
             }
         });
 
         app.get("/inventory", async (req, res) => {
             try {
-                const files = await fs.readdir(options.cache);
-                const jsonFiles = files.filter(file => file.endsWith('.json'));
-                const inventoryList = [];
-
-                for (const file of jsonFiles) {
-                    const filePath = path.join(options.cache, file);
-                    const fileContent = await fs.readFile(filePath, 'utf-8');
-                    inventoryList.push(JSON.parse(fileContent));
-                }
-                
-                res.status(200).json(inventoryList);
+                const result = await pool.request().query(`
+                    SELECT ID as id, InventoryName as inventory_name, Description as description, PhotoPath as photo 
+                    FROM Inventory
+                `);
+                res.status(200).json(result.recordset);
             } catch (error) {
+                console.error(error);
                 res.status(500).json({ error: "Internal error while reading the list." });
             }
         });
 
         app.get("/inventory/:id", async (req, res) => {
-            const itemId = req.params.id; 
-            const filePath = path.join(options.cache, `${itemId}.json`);
-
             try {
-                await fs.access(filePath);
+                const result = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query(`
+                        SELECT ID as id, InventoryName as inventory_name, Description as description, PhotoPath as photo 
+                        FROM Inventory WHERE ID = @id
+                    `);
+
+                if (result.recordset.length === 0) {
+                    return res.status(404).json({ error: "Item with this id was not found." });
+                }
                 
-                const fileContent = await fs.readFile(filePath, "utf-8");
-                const inventoryItem = JSON.parse(fileContent);
-                
-                res.status(200).json(inventoryItem);
+                res.status(200).json(result.recordset[0]);
             } catch (error) {
-                res.status(404).json({ error: "Item with this id was not found." });
+                res.status(500).json({ error: "Internal error" });
             }
         });
 
         app.put('/inventory/:id', async (req, res) => {
-            const itemId = req.params.id;
-            const filePath = path.join(options.cache, `${itemId}.json`);
+            const { inventory_name, description } = req.body;
 
             try {
-                const fileContent = await fs.readFile(filePath, "utf-8");
-                const inventoryItem = JSON.parse(fileContent);
+                // Перевіряємо чи існує запис
+                const checkResult = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query('SELECT ID FROM Inventory WHERE ID = @id');
 
-                if (req.body.inventory_name) {
-                    inventoryItem.inventory_name = req.body.inventory_name;
-                }
-                
-                if (req.body.description !== undefined) { 
-                    inventoryItem.description = req.body.description;
+                if (checkResult.recordset.length === 0) {
+                    return res.status(404).json({ error: "Item with this id was not found." });
                 }
 
-                await fs.writeFile(filePath, JSON.stringify(inventoryItem));
+                // Оновлюємо лише ті поля, які передані
+                const updateResult = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .input('name', sql.NVarChar, inventory_name)
+                    .input('desc', sql.NVarChar, description)
+                    .query(`
+                        UPDATE Inventory 
+                        SET InventoryName = COALESCE(@name, InventoryName), 
+                            Description = COALESCE(@desc, Description)
+                        OUTPUT INSERTED.ID as id, INSERTED.InventoryName as inventory_name, INSERTED.Description as description, INSERTED.PhotoPath as photo
+                        WHERE ID = @id
+                    `);
                 
-                res.status(200).json(inventoryItem);
+                res.status(200).json(updateResult.recordset[0]);
             } catch (error) {
                 console.error(error.message);
-                res.status(404).json({ error: "Item with this id was not found." });
+                res.status(500).json({ error: "Internal server error." });
             }
         });
 
         app.delete('/inventory/:id', async (req, res) => {
-            const itemId = req.params.id;
-            const jsonPath = path.join(options.cache, `${itemId}.json`);
-
             try {
-                const fileContent = await fs.readFile(jsonPath, "utf-8");
-                const inventoryItem = JSON.parse(fileContent);
+                // Спочатку дістаємо інфу, щоб дізнатися чи є фото
+                const result = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query('SELECT PhotoPath FROM Inventory WHERE ID = @id');
 
-                await fs.unlink(jsonPath);
+                if (result.recordset.length === 0) {
+                    return res.status(404).json({ error: "Item with this id was not found." });
+                }
 
-                if (inventoryItem.photo) {
-                    const photoPath = path.join(options.cache, inventoryItem.photo);
-                    await fs.unlink(photoPath).catch(() => {}); 
+                const photoPath = result.recordset[0].PhotoPath;
+
+                // Видаляємо з БД
+                await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query('DELETE FROM Inventory WHERE ID = @id');
+
+                // Видаляємо фізичний файл фотографії, якщо він був
+                if (photoPath) {
+                    const fullPhotoPath = path.join(options.cache, photoPath);
+                    await fs.unlink(fullPhotoPath).catch(() => {}); 
                 }
 
                 res.status(200).json({ message: "Item was successfully deleted." });
             } catch (error) {
-                res.status(404).json({ error: "Item with this id was not found." });
+                res.status(500).json({ error: "Internal server error." });
             }
         });
 
         app.get('/inventory/:id/photo', async (req, res) => {
-            const itemId = req.params.id;
-            const jsonPath = path.join(options.cache, `${itemId}.json`);
-
             try {
-                const fileContent = await fs.readFile(jsonPath, 'utf-8');
-                const inventoryItem = JSON.parse(fileContent);
+                const result = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query('SELECT PhotoPath FROM Inventory WHERE ID = @id');
 
-                if (!inventoryItem.photo) {
-                    return res.status(404).json({ error: "Photo for this item was not found." });
+                if (result.recordset.length === 0 || !result.recordset[0].PhotoPath) {
+                    return res.status(404).json({ error: "Item or its photo was not found." });
                 }
 
-                const photoPath = path.join(options.cache, inventoryItem.photo);
-                await fs.access(photoPath);
+                const fullPhotoPath = path.join(options.cache, result.recordset[0].PhotoPath);
+                await fs.access(fullPhotoPath);
 
                 res.setHeader('Content-Type', 'image/jpeg'); 
-                res.sendFile(path.resolve(photoPath)); 
+                res.sendFile(path.resolve(fullPhotoPath)); 
 
             } catch (error) {
-                res.status(404).json({ error: "Item or it's photo was not found." });
+                res.status(404).json({ error: "Photo file not found on server." });
             }
         });
 
         app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
-            const itemId = req.params.id;
-            const jsonPath = path.join(options.cache, `${itemId}.json`);
-
             if (!req.file) {
                 return res.status(400).json({ error: "Photo file is required." });
             }
 
             try {
-                const fileContent = await fs.readFile(jsonPath, 'utf-8');
-                const inventoryItem = JSON.parse(fileContent);
+                const result = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .query('SELECT PhotoPath FROM Inventory WHERE ID = @id');
 
-                if (inventoryItem.photo) {
-                    const oldPhotoPath = path.join(options.cache, inventoryItem.photo);
-                    await fs.unlink(oldPhotoPath).catch(() => {});
+                if (result.recordset.length === 0) {
+                    const uploadedPhotoPath = path.join(options.cache, req.file.filename);
+                    await fs.unlink(uploadedPhotoPath).catch(() => {});
+                    return res.status(404).json({ error: "Item with this id was not found." });
                 }
 
-                inventoryItem.photo = req.file.filename;
-                await fs.writeFile(jsonPath, JSON.stringify(inventoryItem));
+                const oldPhotoPath = result.recordset[0].PhotoPath;
 
-                res.status(200).json(inventoryItem);
+                // Оновлюємо БД
+                const updateResult = await pool.request()
+                    .input('id', sql.Int, parseInt(req.params.id))
+                    .input('photo', sql.NVarChar, req.file.filename)
+                    .query(`
+                        UPDATE Inventory SET PhotoPath = @photo 
+                        OUTPUT INSERTED.ID as id, INSERTED.InventoryName as inventory_name, INSERTED.Description as description, INSERTED.PhotoPath as photo
+                        WHERE ID = @id
+                    `);
+
+                // Видаляємо старе фото
+                if (oldPhotoPath) {
+                    const oldFullPhotoPath = path.join(options.cache, oldPhotoPath);
+                    await fs.unlink(oldFullPhotoPath).catch(() => {});
+                }
+
+                res.status(200).json(updateResult.recordset[0]);
             } catch (error) {
-                const uploadedPhotoPath = path.join(options.cache, req.file.filename);
-                await fs.unlink(uploadedPhotoPath).catch(() => {});
-
-                res.status(404).json({ error: "Item with this id was not found." });
+                res.status(500).json({ error: "Internal server error." });
             }
         });
 
@@ -209,21 +260,27 @@ async function main() {
                 return res.status(400).json({ error: "Id field is required." });
             }
 
-            const jsonPath = path.join(options.cache, `${id}.json`);
-
             try {
-                const fileContent = await fs.readFile(jsonPath, 'utf-8');
-                const inventoryItem = JSON.parse(fileContent);
+                const result = await pool.request()
+                    .input('id', sql.Int, parseInt(id))
+                    .query(`
+                        SELECT ID as id, InventoryName as inventory_name, Description as description, PhotoPath as photo 
+                        FROM Inventory WHERE ID = @id
+                    `);
 
-                if (has_photo === 'on' || has_photo === true) {
-                    if (inventoryItem.photo) {
-                        inventoryItem.description += ` (Photo link: /inventory/${id}/photo)`;
-                    }
+                if (result.recordset.length === 0) {
+                    return res.status(404).json({ error: "Item was not found." });
+                }
+
+                const inventoryItem = result.recordset[0];
+
+                if ((has_photo === 'on' || has_photo === true) && inventoryItem.photo) {
+                    inventoryItem.description += ` (Photo link: /inventory/${inventoryItem.id}/photo)`;
                 }
 
                 res.status(200).json(inventoryItem);
             } catch (error) {
-                res.status(404).json({ error: "Item was not found." });
+                res.status(500).json({ error: "Internal server error." });
             }
         });
 

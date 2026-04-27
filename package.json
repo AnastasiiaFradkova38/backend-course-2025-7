@@ -15,11 +15,14 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --inspect=0.0.0.0:9229 main.js --host 0.0.0.0 --port 3000 --cache cache"
   },
   "dependencies": {
     "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "mssql": "^12.5.0",
     "multer": "^2.1.1",
     "superagent": "^10.3.0",
     "swagger-ui-express": "^5.0.1"
