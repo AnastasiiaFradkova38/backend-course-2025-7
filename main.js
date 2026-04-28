@@ -21,15 +21,14 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Налаштування підключення до БД SQL Server
 const dbConfig = {
     user: 'sa',
-    password: 'MySecretPass2026',
-    server: 'db', // Назва сервісу в compose.yml
+    password: process.env.DB_PASSWORD,
+    server: 'db',
     database: 'InventoryDB',
     port: 1433,
     options: {
-        encrypt: false,
+        encrypt: true,
         trustServerCertificate: true
     }
 };
@@ -55,10 +54,8 @@ async function main() {
             throw new Error("Invalid port specified.");
         }
 
-        // Створюємо папку для фотографій
         await fs.mkdir(options.cache, {recursive: true});
 
-        // Підключаємося до БД один раз при старті сервера
         const pool = await sql.connect(dbConfig);
         console.log("Connected to SQL Server!");
     
@@ -125,7 +122,6 @@ async function main() {
             const { inventory_name, description } = req.body;
 
             try {
-                // Перевіряємо чи існує запис
                 const checkResult = await pool.request()
                     .input('id', sql.Int, parseInt(req.params.id))
                     .query('SELECT ID FROM Inventory WHERE ID = @id');
@@ -134,7 +130,6 @@ async function main() {
                     return res.status(404).json({ error: "Item with this id was not found." });
                 }
 
-                // Оновлюємо лише ті поля, які передані
                 const updateResult = await pool.request()
                     .input('id', sql.Int, parseInt(req.params.id))
                     .input('name', sql.NVarChar, inventory_name)
@@ -156,7 +151,6 @@ async function main() {
 
         app.delete('/inventory/:id', async (req, res) => {
             try {
-                // Спочатку дістаємо інфу, щоб дізнатися чи є фото
                 const result = await pool.request()
                     .input('id', sql.Int, parseInt(req.params.id))
                     .query('SELECT PhotoPath FROM Inventory WHERE ID = @id');
@@ -167,12 +161,10 @@ async function main() {
 
                 const photoPath = result.recordset[0].PhotoPath;
 
-                // Видаляємо з БД
                 await pool.request()
                     .input('id', sql.Int, parseInt(req.params.id))
                     .query('DELETE FROM Inventory WHERE ID = @id');
 
-                // Видаляємо фізичний файл фотографії, якщо він був
                 if (photoPath) {
                     const fullPhotoPath = path.join(options.cache, photoPath);
                     await fs.unlink(fullPhotoPath).catch(() => {}); 
@@ -223,7 +215,6 @@ async function main() {
 
                 const oldPhotoPath = result.recordset[0].PhotoPath;
 
-                // Оновлюємо БД
                 const updateResult = await pool.request()
                     .input('id', sql.Int, parseInt(req.params.id))
                     .input('photo', sql.NVarChar, req.file.filename)
@@ -233,7 +224,6 @@ async function main() {
                         WHERE ID = @id
                     `);
 
-                // Видаляємо старе фото
                 if (oldPhotoPath) {
                     const oldFullPhotoPath = path.join(options.cache, oldPhotoPath);
                     await fs.unlink(oldFullPhotoPath).catch(() => {});
